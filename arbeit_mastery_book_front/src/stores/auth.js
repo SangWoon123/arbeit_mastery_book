@@ -1,46 +1,84 @@
 import { defineStore } from 'pinia'
-import { getAuth, getIdToken, onAuthStateChanged, signInWithEmailAndPassword } from 'firebase/auth'
-import { ref } from 'vue'
+import {
+  getAuth,
+  getIdToken,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  signOut,
+} from 'firebase/auth'
 
-export const useAuthStore = defineStore('auth', () => {
-  const user = ref(null)
-  const token = ref(localStorage.getItem('authToken'))
-  const isLoading = ref(false) // 로딩 상태 추가
-  const error = ref(null) // 에러 상태 추가
+export const useAuthStore = defineStore('auth', {
+  state: () => ({
+    user: null,
+    token: localStorage.getItem('authToken'),
+    isLoading: false,
+  }),
 
-  const auth = getAuth()
+  actions: {
+    // 인증 상태 초기화
+    initializeAuthState() {
+      const auth = getAuth()
 
-  // 인증 상태 초기화
-  const initializeAuthState = () => {
-    onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        user.value = currentUser
-        token.value = await currentUser.getIdToken()
-        localStorage.setItem('authToken', token.value)
-      } else {
-        user.value = null
-        token.value = null
-        localStorage.removeItem('authToken')
+      onAuthStateChanged(auth, async (currentUser) => {
+        if (currentUser) {
+          this.user = currentUser
+          this.token = await currentUser.getIdToken()
+          localStorage.setItem('authToken', this.token)
+        } else {
+          this.user = null
+          this.token = null
+          localStorage.removeItem('authToken')
+        }
+      })
+    },
+
+    // 회원가입 함수
+    async signUp(email, password, name) {
+      try {
+        await createUserWithEmailAndPassword(getAuth(), email, password)
+        await updateProfile(getAuth().currentUser, {
+          displayName: name,
+        })
+        this.user = getAuth().currentUser
+        this.token = await getIdToken(this.user)
+        localStorage.setItem('authToken', this.token)
+      } catch (error) {
+        console.error('SignUp failed:', error.message)
       }
-    })
-  }
+    },
 
-  // 로그인 함수
-  const login = async (email, password) => {
-    try {
-      isLoading.value = true
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
-      user.value = userCredential.user
-      token.value = await getIdToken(user.value)
-      localStorage.setItem('authToken', token.value) // 로그인 성공 시 토큰 저장
-    } catch (err) {
-      error.value = err.message
-    } finally {
-      isLoading.value = false
-    }
-  }
+    // 로그인 함수
+    async login(email, password) {
+      try {
+        this.isLoading = true
+        const userCredential = await signInWithEmailAndPassword(getAuth(), email, password)
+        this.user = userCredential.user
+        this.token = await getIdToken(this.user)
+        localStorage.setItem('authToken', this.token) // 로그인 성공 시 토큰 저장
+      } catch (err) {
+        this.error = err.message
+      } finally {
+        this.isLoading = false
+      }
+    },
 
-  initializeAuthState()
+    // 로그아웃 함수
+    async logout() {
+      const auth = getAuth()
 
-  return { user, token, login, isLoading, error }
+      try {
+        this.isLoading = true
+        await signOut(auth)
+        this.user = null
+        this.token = null
+        localStorage.removeItem('authToken')
+      } catch (err) {
+        this.error = err.message
+      } finally {
+        this.isLoading = false
+      }
+    },
+  },
 })

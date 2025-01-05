@@ -7,6 +7,15 @@
             <v-row>
               <v-col cols="12">
                 <v-text-field
+                  type="text"
+                  label="Name"
+                  v-model="name"
+                  :rules="[nameRule]"
+                  required
+                ></v-text-field>
+              </v-col>
+              <v-col cols="12">
+                <v-text-field
                   type="email"
                   label="E-mail"
                   v-model="email"
@@ -51,16 +60,19 @@
 
 <script setup>
 import { ref } from 'vue'
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const goToLogin = () => {
   router.push('/')
 }
+
+const authStore = useAuthStore()
 const show1 = ref(false)
 const form = ref()
 
+const name = ref('')
 const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
@@ -69,6 +81,11 @@ const togglePasswordVisibility = () => {
   show1.value = !show1.value
 }
 
+const nameRule = (value) => {
+  if (!value) {
+    return 'Name is required'
+  }
+}
 // 이메일 유효성 검사
 const emailRule = (value) => {
   if (!value) {
@@ -102,18 +119,12 @@ const confirmPasswordRule = (value) => {
   }
   return true
 }
-const auth = getAuth()
 const signUp = async () => {
   // const isValid = await form.value
   // if (!isValid) {
   //   return
   // }
-  try {
-    const userCredential = await createUserWithEmailAndPassword(auth, email.value, password.value)
-    const user = userCredential.user
-    console.log('Logged in as:', user.email)
-  } catch (error) {
-    console.error('Login failed:', error.message)
-  }
+  await authStore.signUp(email, password, name)
+  router.replace('/')
 }
 </script>
